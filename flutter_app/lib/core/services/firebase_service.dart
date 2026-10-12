@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -23,6 +22,8 @@ class FirebaseService {
   String? get apnsToken => _apnsToken;
   NotificationSettings? get notificationSettings => _notificationSettings;
   String get deviceId => _deviceId ?? 'unknown_device';
+
+  bool get isIOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   Future<void> initialize() async {
     try {
@@ -59,22 +60,33 @@ class FirebaseService {
       final messaging = FirebaseMessaging.instance;
 
       // Request push permissions
-      _notificationSettings = await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
+      try {
+        _notificationSettings = await messaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+          provisional: false,
+        );
+      } catch (e) {
+        debugPrint('Push permission request note: $e');
+      }
 
-      // On iOS, request APNs token
-      if (!kIsWeb && Platform.isIOS) {
-        _apnsToken = await messaging.getAPNSToken();
+      // On physical iOS, request APNs token
+      if (isIOS) {
+        try {
+          _apnsToken = await messaging.getAPNSToken();
+        } catch (e) {
+          debugPrint('APNs token note: $e');
+        }
       }
 
       // Get FCM token
-      _fcmToken = await messaging.getToken();
-      debugPrint('Firebase Messaging FCM Token: $_fcmToken');
-      debugPrint('Firebase Messaging APNs Token: $_apnsToken');
+      try {
+        _fcmToken = await messaging.getToken();
+        debugPrint('Firebase Messaging FCM Token: $_fcmToken');
+      } catch (e) {
+        debugPrint('FCM Token note (Mock mode active): $e');
+      }
 
       // Listen for token refreshes
       messaging.onTokenRefresh.listen((newToken) {
@@ -85,10 +97,10 @@ class FirebaseService {
       // Handle foreground notifications
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('Got a message whilst in the foreground: ${message.messageId}');
-        
+
         final title = message.notification?.title ?? message.data['title'] ?? 'StorePulse';
         final body = message.notification?.body ?? message.data['body'] ?? 'New simulated activity';
-        
+
         LocalNotificationService.instance.showNotification(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
           title: title,
@@ -119,12 +131,28 @@ class FirebaseService {
       final isGranted = _notificationSettings?.authorizationStatus ==
           AuthorizationStatus.authorized;
 
+      String platformName = 'web';
+      String deviceModel = 'Web Browser (Safari)';
+
+      if (!kIsWeb) {
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          platformName = 'ios';
+          deviceModel = 'iPhone 18 Pro';
+        } else if (defaultTargetPlatform == TargetPlatform.android) {
+          platformName = 'android';
+          deviceModel = 'Android Device';
+        } else {
+          platformName = 'windows';
+          deviceModel = 'Windows Host';
+        }
+      }
+
       await firestore.collection('devices').doc(_deviceId).set({
         'deviceId': _deviceId,
         'fcmToken': _fcmToken,
         'apnsToken': _apnsToken,
-        'platform': kIsWeb ? 'web' : (Platform.isIOS ? 'ios' : Platform.operatingSystem),
-        'deviceModel': kIsWeb ? 'Browser' : (Platform.isIOS ? 'iPhone 18 Pro' : 'Windows Host'),
+        'platform': platformName,
+        'deviceModel': deviceModel,
         'isPermissionGranted': isGranted,
         'isValid': true,
         'lastSeenAt': FieldValue.serverTimestamp(),

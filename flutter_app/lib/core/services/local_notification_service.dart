@@ -11,6 +11,12 @@ class LocalNotificationService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
+    if (kIsWeb) {
+      // Web browser uses web Notification API or in-app snackbars/banners
+      _isInitialized = true;
+      return;
+    }
+
     try {
       const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -46,6 +52,11 @@ class LocalNotificationService {
     required String body,
     String? payload,
   }) async {
+    if (kIsWeb) {
+      debugPrint('[Web In-App Notification] $title: $body');
+      return;
+    }
+
     try {
       const AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(

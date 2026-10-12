@@ -8,17 +8,26 @@ import 'core/theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize local notifications (offline preview, in-app alerts)
-  await LocalNotificationService.instance.initialize();
-
-  // Initialize Firebase (or graceful fallback if credentials pending)
-  await FirebaseService.instance.initialize();
-
+  // 1. Immediately launch UI so web/mobile screen never stays blank
   runApp(
     const ProviderScope(
       child: StorePulseApp(),
     ),
   );
+
+  // 2. Initialize local notification plugins asynchronously
+  try {
+    await LocalNotificationService.instance.initialize();
+  } catch (e) {
+    debugPrint('Local notifications initialization note: $e');
+  }
+
+  // 3. Initialize Firebase asynchronously
+  try {
+    await FirebaseService.instance.initialize();
+  } catch (e) {
+    debugPrint('Firebase initialization note: $e');
+  }
 }
 
 class StorePulseApp extends StatelessWidget {
