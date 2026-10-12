@@ -1,0 +1,52 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          cd flutter_app
+          flutter pub get
+
+      - name: Build iOS Application
+        run: |
+          cd flutter_app
+          flutter build ios --release --no-codesign
+
+      - name: Package Payload into unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -r flutter_app/build/ios/iphoneos/Runner.app Payload/
+          zip -r StorePulse_unsigned.ipa Payload
+          zip -r Runner_app.zip flutter_app/build/ios/iphoneos/Runner.app
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StorePulse-iOS-Build
+          path: |
+            StorePulse_unsigned.ipa
+            Runner_app.zip
+          retention-days: 7
