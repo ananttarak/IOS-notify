@@ -8,47 +8,25 @@ import '../models/notification_history_model.dart';
 import '../services/firebase_service.dart';
 import '../services/local_notification_service.dart';
 
-// --- SEED TEMPLATES ---
+// --- SEED TEMPLATES (Single exact template matching reference screenshot) ---
 final List<TemplateModel> _initialTemplates = [
   TemplateModel(
-    id: 'tmpl_1',
+    id: 'tmpl_folkthreads',
     title: 'Order #{{order_id}}',
-    body: '{{amount}}, {{items}} item(s) from Online Store · Paya Ecom',
-    weight: 40,
+    body: '{{amount}}, {{items}} from {{channel}} •\n{{store}}',
+    weight: 100,
     isEnabled: true,
-    isSimulated: true,
-    defaultVariables: {'store': 'Online Store · Paya Ecom'},
+    isSimulated: false,
+    customAmount: '₹6,555.00',
+    startOrderNumber: 1794,
+    storeName: 'Folkthreads',
+    defaultVariables: {
+      'channel': 'Online Store',
+      'store': 'Folkthreads',
+      'amount': '₹6,555.00',
+      'items': '1 item',
+    },
     createdAt: DateTime.now().subtract(const Duration(days: 1)),
-  ),
-  TemplateModel(
-    id: 'tmpl_2',
-    title: 'Store Activity',
-    body: 'Your store has a new activity update.',
-    weight: 20,
-    isEnabled: true,
-    isSimulated: true,
-    defaultVariables: {},
-    createdAt: DateTime.now().subtract(const Duration(hours: 18)),
-  ),
-  TemplateModel(
-    id: 'tmpl_3',
-    title: 'New Order Received',
-    body: 'Simulation: a new order notification preview.',
-    weight: 25,
-    isEnabled: true,
-    isSimulated: true,
-    defaultVariables: {},
-    createdAt: DateTime.now().subtract(const Duration(hours: 12)),
-  ),
-  TemplateModel(
-    id: 'tmpl_4',
-    title: 'Sales Update',
-    body: 'Your simulated store activity update is ready.',
-    weight: 15,
-    isEnabled: true,
-    isSimulated: true,
-    defaultVariables: {},
-    createdAt: DateTime.now().subtract(const Duration(hours: 4)),
   ),
 ];
 
@@ -57,6 +35,40 @@ class TemplatesNotifier extends Notifier<List<TemplateModel>> {
   @override
   List<TemplateModel> build() {
     return _initialTemplates;
+  }
+
+  void updateCustomAmount(String amount) {
+    state = [
+      for (final tmpl in state)
+        tmpl.copyWith(
+          customAmount: amount,
+          defaultVariables: {
+            ...tmpl.defaultVariables,
+            'amount': amount,
+          },
+        ),
+    ];
+  }
+
+  void updateStartOrderNumber(int startNum) {
+    TemplateModel.setNextOrderNumber(startNum);
+    state = [
+      for (final tmpl in state)
+        tmpl.copyWith(startOrderNumber: startNum),
+    ];
+  }
+
+  void updateStoreName(String store) {
+    state = [
+      for (final tmpl in state)
+        tmpl.copyWith(
+          storeName: store,
+          defaultVariables: {
+            ...tmpl.defaultVariables,
+            'store': store,
+          },
+        ),
+    ];
   }
 
   void addTemplate(TemplateModel template) {
@@ -83,20 +95,7 @@ class TemplatesNotifier extends Notifier<List<TemplateModel>> {
 
   TemplateModel? selectRandomTemplate() {
     final enabled = state.where((t) => t.isEnabled).toList();
-    if (enabled.isEmpty) return null;
-
-    final totalWeight = enabled.fold<int>(0, (sum, t) => sum + t.weight);
-    if (totalWeight <= 0) {
-      return enabled[Random().nextInt(enabled.length)];
-    }
-
-    int randomValue = Random().nextInt(totalWeight);
-    for (final tmpl in enabled) {
-      if (randomValue < tmpl.weight) {
-        return tmpl;
-      }
-      randomValue -= tmpl.weight;
-    }
+    if (enabled.isEmpty) return _initialTemplates.first;
     return enabled.first;
   }
 }
@@ -119,9 +118,8 @@ class ScheduleNotifier extends Notifier<ScheduleModel> {
 
   void _calculateNextPlannedSend() {
     if (state.status == SchedulerStatus.running && !state.emergencyStop) {
-      final range = max(1, state.maxIntervalSeconds - state.minIntervalSeconds);
-      final delaySeconds = state.minIntervalSeconds + Random().nextInt(range);
-      final nextTime = DateTime.now().add(Duration(seconds: delaySeconds));
+      final intervalMs = state.calculatedIntervalMs;
+      final nextTime = DateTime.now().add(Duration(milliseconds: intervalMs));
       state = state.copyWith(nextPlannedSendTime: nextTime);
     } else {
       state = state.copyWith(nextPlannedSendTime: null);
@@ -134,6 +132,8 @@ class ScheduleNotifier extends Notifier<ScheduleModel> {
       emergencyStop: false,
     );
     _calculateNextPlannedSend();
+    // Fire the first notification immediately for instant feedback
+    ref.read(historyProvider.notifier).triggerScheduledPush();
     _startClientPreviewLoop();
   }
 
@@ -172,6 +172,13 @@ class ScheduleNotifier extends Notifier<ScheduleModel> {
   }
 
   void updateSettings({
+    int? notificationsPerInterval,
+    int? intervalMinutes,
+    double? minOrderAmount,
+    double? maxOrderAmount,
+    double? orderAmount,
+    int? startOrderNumber,
+    String? storeName,
     int? minIntervalSeconds,
     int? maxIntervalSeconds,
     int? maxPerHour,
@@ -181,7 +188,17 @@ class ScheduleNotifier extends Notifier<ScheduleModel> {
     String? quietHoursEnd,
     int? duplicatePreventionMinutes,
   }) {
+    if (startOrderNumber != null) {
+      TemplateModel.setNextOrderNumber(startOrderNumber);
+    }
     state = state.copyWith(
+      notificationsPerInterval: notificationsPerInterval,
+      intervalMinutes: intervalMinutes,
+      minOrderAmount: minOrderAmount,
+      maxOrderAmount: maxOrderAmount,
+      orderAmount: orderAmount,
+      startOrderNumber: startOrderNumber,
+      storeName: storeName,
       minIntervalSeconds: minIntervalSeconds,
       maxIntervalSeconds: maxIntervalSeconds,
       maxPerHour: maxPerHour,
@@ -193,6 +210,7 @@ class ScheduleNotifier extends Notifier<ScheduleModel> {
     );
     if (state.status == SchedulerStatus.running) {
       _calculateNextPlannedSend();
+      _startClientPreviewLoop();
     }
   }
 
@@ -205,21 +223,18 @@ class ScheduleNotifier extends Notifier<ScheduleModel> {
     _calculateNextPlannedSend();
   }
 
-  /// Client-side simulation loop for local previews when running on Windows/Web
+  /// Client-side simulation loop running based on 3 sliders (notifications count / interval minutes)
   void _startClientPreviewLoop() {
     _localLoopTimer?.cancel();
     if (state.status != SchedulerStatus.running || state.emergencyStop) return;
 
-    final next = state.nextPlannedSendTime;
-    final now = DateTime.now();
-    final delay = (next != null && next.isAfter(now))
-        ? next.difference(now)
-        : Duration(seconds: state.minIntervalSeconds);
-
-    _localLoopTimer = Timer(delay, () async {
+    final intervalMs = state.calculatedIntervalMs;
+    _localLoopTimer = Timer.periodic(Duration(milliseconds: intervalMs), (_) async {
       if (state.status == SchedulerStatus.running && !state.emergencyStop) {
         await ref.read(historyProvider.notifier).triggerScheduledPush();
-        _startClientPreviewLoop();
+      } else {
+        _localLoopTimer?.cancel();
+        _localLoopTimer = null;
       }
     });
   }
@@ -258,10 +273,14 @@ class HistoryNotifier extends Notifier<List<NotificationHistoryModel>> {
     }
 
     final template =
-        ref.read(templatesProvider.notifier).selectRandomTemplate();
-    if (template == null) return;
+        ref.read(templatesProvider.notifier).selectRandomTemplate() ??
+            _initialTemplates.first;
 
-    final rendered = template.render();
+    final formattedAmount = schedule.getRandomFormattedAmount();
+    final rendered = template.render({
+      'amount': formattedAmount,
+      'store': schedule.storeName,
+    });
     final historyId = const Uuid().v4();
 
     // Trigger local banner for immediate sensory confirmation
@@ -277,46 +296,51 @@ class HistoryNotifier extends Notifier<List<NotificationHistoryModel>> {
       title: rendered['title']!,
       body: rendered['body']!,
       status: DeliveryStatus.submitted,
-      fcmMessageId: 'projects/storepulse/messages/fcm_$historyId',
+      fcmMessageId: 'shopify_push_$historyId',
       scheduledAt: DateTime.now(),
       fcmSubmittedAt: DateTime.now(),
-      serverResponse: 'HTTP 200 - FCM Accepted for APNs Delivery',
+      serverResponse: 'HTTP 200 - Order notification triggered',
       diagnostics: {
-        'weight': template.weight,
-        'channel': 'apns-priority-10',
-        'isSimulated': true,
+        'store': schedule.storeName,
+        'amount': formattedAmount,
       },
-      isSimulated: true,
+      isSimulated: false,
     );
 
     state = [historyItem, ...state];
     ref.read(scheduleProvider.notifier).incrementCounts();
   }
 
-  Future<void> sendTestNotification({
-    String title = 'Order #6745',
-    String body = '\$34.99, 1 item from Online Store · Paya Ecom',
-  }) async {
+  Future<void> sendTestNotification() async {
+    final schedule = ref.read(scheduleProvider);
+    final template =
+        ref.read(templatesProvider.notifier).selectRandomTemplate() ??
+            _initialTemplates.first;
+    final formattedAmount = schedule.getRandomFormattedAmount();
+    final rendered = template.render({
+      'amount': formattedAmount,
+      'store': schedule.storeName,
+    });
     final historyId = const Uuid().v4();
 
     await LocalNotificationService.instance.showNotification(
       id: Random().nextInt(100000),
-      title: title,
-      body: body,
+      title: rendered['title']!,
+      body: rendered['body']!,
     );
 
     final item = NotificationHistoryModel(
       id: historyId,
-      templateId: 'test_manual',
-      title: title,
-      body: body,
+      templateId: template.id,
+      title: rendered['title']!,
+      body: rendered['body']!,
       status: DeliveryStatus.submitted,
-      fcmMessageId: 'fcm_test_$historyId',
+      fcmMessageId: 'shopify_push_$historyId',
       scheduledAt: DateTime.now(),
       fcmSubmittedAt: DateTime.now(),
-      serverResponse: 'HTTP 200 - Test Push Dispatched via FCM gateway',
-      diagnostics: {'test': true, 'environment': 'sandbox/production'},
-      isSimulated: true,
+      serverResponse: 'HTTP 200 - Order notification triggered',
+      diagnostics: {'store': schedule.storeName, 'amount': formattedAmount},
+      isSimulated: false,
     );
 
     state = [item, ...state];

@@ -54,10 +54,11 @@ void main() {
     test('defaults to stopped status and default safety limits', () {
       const schedule = ScheduleModel();
       expect(schedule.status, equals(SchedulerStatus.stopped));
-      expect(schedule.minIntervalSeconds, equals(30));
-      expect(schedule.maxIntervalSeconds, equals(180));
-      expect(schedule.maxPerHour, equals(20));
-      expect(schedule.maxPerDay, equals(100));
+      expect(schedule.intervalMilliseconds, equals(40));
+      expect(schedule.minIntervalSeconds, equals(0));
+      expect(schedule.maxIntervalSeconds, equals(1));
+      expect(schedule.maxPerHour, equals(50000));
+      expect(schedule.maxPerDay, equals(500000));
       expect(schedule.emergencyStop, isFalse);
     });
 

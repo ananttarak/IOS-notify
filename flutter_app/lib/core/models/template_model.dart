@@ -1,5 +1,3 @@
-import 'dart:math';
-
 class TemplateModel {
   final String id;
   final String title;
@@ -7,6 +5,9 @@ class TemplateModel {
   final int weight;
   final bool isEnabled;
   final bool isSimulated;
+  final String customAmount;
+  final int startOrderNumber;
+  final String storeName;
   final Map<String, String> defaultVariables;
   final DateTime createdAt;
 
@@ -17,6 +18,9 @@ class TemplateModel {
     this.weight = 10,
     this.isEnabled = true,
     this.isSimulated = true,
+    this.customAmount = '₹6,555.00',
+    this.startOrderNumber = 1794,
+    this.storeName = 'Folkthreads',
     this.defaultVariables = const {},
     required this.createdAt,
   });
@@ -28,6 +32,9 @@ class TemplateModel {
     int? weight,
     bool? isEnabled,
     bool? isSimulated,
+    String? customAmount,
+    int? startOrderNumber,
+    String? storeName,
     Map<String, String>? defaultVariables,
     DateTime? createdAt,
   }) {
@@ -38,6 +45,9 @@ class TemplateModel {
       weight: weight ?? this.weight,
       isEnabled: isEnabled ?? this.isEnabled,
       isSimulated: isSimulated ?? this.isSimulated,
+      customAmount: customAmount ?? this.customAmount,
+      startOrderNumber: startOrderNumber ?? this.startOrderNumber,
+      storeName: storeName ?? this.storeName,
       defaultVariables: defaultVariables ?? this.defaultVariables,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -51,6 +61,9 @@ class TemplateModel {
       'weight': weight,
       'isEnabled': isEnabled,
       'isSimulated': isSimulated,
+      'customAmount': customAmount,
+      'startOrderNumber': startOrderNumber,
+      'storeName': storeName,
       'defaultVariables': defaultVariables,
       'createdAt': createdAt.toIso8601String(),
     };
@@ -64,6 +77,9 @@ class TemplateModel {
       weight: (map['weight'] as num?)?.toInt() ?? 10,
       isEnabled: map['isEnabled'] ?? true,
       isSimulated: map['isSimulated'] ?? true,
+      customAmount: map['customAmount'] ?? '₹6,555.00',
+      startOrderNumber: (map['startOrderNumber'] as num?)?.toInt() ?? 1794,
+      storeName: map['storeName'] ?? 'Folkthreads',
       defaultVariables: Map<String, String>.from(map['defaultVariables'] ?? {}),
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
@@ -71,14 +87,31 @@ class TemplateModel {
     );
   }
 
+  static int _orderCounter = 1794;
+
+  static void setNextOrderNumber(int num) {
+    _orderCounter = num;
+  }
+
+  static int get currentOrderNumber => _orderCounter;
+
   /// Interpolate placeholders such as {{order_id}}, {{amount}}, {{items}}, {{store}}
+  /// Follows strict sequential progression (1, 2, 3...)
   Map<String, String> render([Map<String, dynamic>? customVars]) {
+    final currentOrderNum = _orderCounter++; // Follow sequence 1 by 1
+
+    final amountVal = customVars?['amount']?.toString() ??
+        (customAmount.isNotEmpty ? customAmount : '₹6,555.00');
+    final storeVal = customVars?['store']?.toString() ??
+        (storeName.isNotEmpty ? storeName : 'Folkthreads');
+
     final vars = <String, String>{
-      'order_id': '${1000 + Random().nextInt(8999)}',
-      'amount': '\$${(15 + Random().nextInt(150)).toStringAsFixed(2)}',
-      'items': '${1 + Random().nextInt(4)}',
-      'store': 'StorePulse Demo',
-      'currency': 'USD',
+      'order_id': '$currentOrderNum',
+      'amount': amountVal,
+      'items': '1 item',
+      'channel': 'Online Store',
+      'store': storeVal,
+      'currency': 'INR',
       ...defaultVariables,
       if (customVars != null)
         ...customVars.map((k, v) => MapEntry(k, v.toString())),
@@ -95,6 +128,7 @@ class TemplateModel {
     return {
       'title': renderedTitle,
       'body': renderedBody,
+      'order_id': '$currentOrderNum',
       'isSimulated': isSimulated ? 'true' : 'false',
     };
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'web_notification_helper.dart';
+
 class LocalNotificationService {
   LocalNotificationService._();
   static final LocalNotificationService instance = LocalNotificationService._();
@@ -12,10 +14,10 @@ class LocalNotificationService {
     if (_isInitialized) return;
 
     if (kIsWeb) {
-      // Web browser uses web Notification API or in-app snackbars/banners
       _isInitialized = true;
       return;
     }
+
 
     try {
       const AndroidInitializationSettings androidSettings =
@@ -46,6 +48,19 @@ class LocalNotificationService {
     }
   }
 
+  Future<bool> requestPermission() async {
+    if (kIsWeb) {
+      return await requestWebNotificationPermission();
+    }
+    return true;
+  }
+
+  void playChime() {
+    if (kIsWeb) {
+      playWebChime();
+    }
+  }
+
   Future<void> showNotification({
     required int id,
     required String title,
@@ -53,7 +68,8 @@ class LocalNotificationService {
     String? payload,
   }) async {
     if (kIsWeb) {
-      debugPrint('[Web In-App Notification] $title: $body');
+      debugPrint('[Web Push Notification] $title: $body');
+      await showWebNotification(title, body);
       return;
     }
 
@@ -72,6 +88,7 @@ class LocalNotificationService {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        sound: 'shopify_sound.aiff',
       );
 
       const NotificationDetails platformDetails = NotificationDetails(

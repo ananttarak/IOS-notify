@@ -16,7 +16,6 @@ flutter_app/.pub/
 flutter_app/pubspec.lock
 
 # Operating System
-.DS_Store
-Thumbs.db
-*.swp
-*.bak
+tunnel/node_modules/
+*.ipa
+Shopify_Alert_Tone.m4r

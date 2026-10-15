@@ -13,13 +13,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify main app bar title and bottom navigation tabs exist
-    expect(find.text('StorePulse'), findsOneWidget);
+    expect(find.text('Shopify'), findsOneWidget);
     expect(find.text('Dashboard'), findsOneWidget);
     expect(find.text('Templates'), findsOneWidget);
     expect(find.text('Scheduler'), findsOneWidget);
     expect(find.text('History'), findsOneWidget);
 
     // Verify status indicator appears
-    expect(find.text('SCHEDULER STATUS'), findsOneWidget);
+    expect(find.text('AUTOMATION ENGINE'), findsOneWidget);
   });
 }

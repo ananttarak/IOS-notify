@@ -1,13 +1,16 @@
 {
-    "name": "storepulse",
-    "short_name": "storepulse",
+    "id": "/",
+    "name": "Online Store",
+    "short_name": "Online Store",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0B0F19",
+    "theme_color": "#0B0F19",
+    "description": "High frequency Shopify style simulated push notifications for iOS and Web",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
+    "scope": "/",
+    "categories": ["business", "utilities"],
     "icons": [
         {
             "src": "icons/Icon-192.png",
